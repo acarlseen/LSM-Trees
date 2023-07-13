@@ -130,7 +130,8 @@ class LSMTree():
 
         bookend_list = list(self.mem_table.keys())
         first, last = bookend_list[0], bookend_list[-1] #could present difficulty-- does not follow key:value format of the file
-        new_file.write(f'{first}, {last},')      #this writes a first and last key at the top of the file (might delete)
+        
+        new_file.write(f'{first}, {last}, \n')      #this writes a first and last key at the top of the file (might delete)
         new_file.write(self.mem_table)
         new_file.close()
         self.mem_table.clear()
@@ -138,8 +139,32 @@ class LSMTree():
     def search_LSM(self, key): #does this funcion return anything?
         if key in self.mem_table:
             print('found in mem table')
+            return self.mem_table.get(key)
         else:
             print('not found in mem table, searching disk')
+            for files in self.file_tree:
+                current = open(files)
+                contents_dict = current.read()
+                contents_dict = contents_dict.split(',')
+                contents_dict = [items.split(':') for items in contents_dict]
+                if key in contents_dict:
+                    print(f'key found in file {file}')
+                    return contents_dict.get(key)
+                contents_dict.clear()
+        print('Key not found in LSM')
+        return None
+    
+    def write(self, key, value):
+        self.mem_table.setdefault(key, 0)
+        self.mem_table[key] = value
+        f = open('lsm.log')
+        f.write(f'{key}:{value},')
+        f.close()
+
+    def read(self, key):
+        if key in self.mem_table:
+            return self.mem_table.get(key)
+
 
 
 
