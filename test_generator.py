@@ -64,3 +64,4 @@ def many_tests(num_commands: int, num_tests: int):
     return True
     
 many_tests(15, 200)
+
