@@ -33,7 +33,6 @@ Compare key:value pairs across segments and update to most recent value:
 '''
 
 import collections
-import test_generator
 
 
 '''Maybe it makes sense to build the mem-table as a linked list coupled with a sparse list
@@ -115,6 +114,40 @@ class LSMTree():
         self.tree_dir = tree_dir
         self.mem_table = {}
 
+    def search_LSM(self, key): #does this funcion return anything?
+        if key in self.mem_table:
+            print('found in mem table')
+            return self.mem_table.get(key)
+        else:
+            print('not found in mem table, searching disk')
+            for files in self.file_tree:
+                current = open(files)
+                contents_dict = current.read()
+                contents_dict = contents_dict.split(',')
+                contents_dict = [items.split(':') for items in contents_dict]
+                if key in contents_dict:
+                    print(f'key found in file {file}')
+                    return contents_dict.get(key)
+                contents_dict.clear()
+        print('Key not found in LSM')
+        return None
+    
+    def write(self, key, value):        #put
+        self.mem_table.setdefault(key, 0)
+        self.mem_table[key] = value
+        f = open('lsm.log', 'w')
+        f.write(f'{key}:{value},')
+        f.close()
+
+    def read(self, key):                #get
+        if key in self.mem_table:
+            return self.mem_table.get(key)
+        
+    def delete(self, key):
+        self.mem_table.setdefault(key, 0)
+        self.mem_table[key] = 'del'
+
+
     def filename_generator(self) -> str:
         #creates a "unique" filename in a specified directory and returns it as a string
         #considering using date time + system time, should be unique enough
@@ -135,36 +168,4 @@ class LSMTree():
         new_file.write(self.mem_table)
         new_file.close()
         self.mem_table.clear()
-
-    def search_LSM(self, key): #does this funcion return anything?
-        if key in self.mem_table:
-            print('found in mem table')
-            return self.mem_table.get(key)
-        else:
-            print('not found in mem table, searching disk')
-            for files in self.file_tree:
-                current = open(files)
-                contents_dict = current.read()
-                contents_dict = contents_dict.split(',')
-                contents_dict = [items.split(':') for items in contents_dict]
-                if key in contents_dict:
-                    print(f'key found in file {file}')
-                    return contents_dict.get(key)
-                contents_dict.clear()
-        print('Key not found in LSM')
-        return None
-    
-    def write(self, key, value):
-        self.mem_table.setdefault(key, 0)
-        self.mem_table[key] = value
-        f = open('lsm.log')
-        f.write(f'{key}:{value},')
-        f.close()
-
-    def read(self, key):
-        if key in self.mem_table:
-            return self.mem_table.get(key)
-
-
-
 

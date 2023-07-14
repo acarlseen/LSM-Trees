@@ -34,7 +34,7 @@ def dict_test(LSM_dict: dict, command_list: list):
         else:
             #get
             if key in LSM_dict.keys():
-                print(f'the value @ {key} is {LSM_dict[key]}')
+                print(LSM_dict[key])
             else:
                 print("Key does not exist")
     #print(LSM_dict)
