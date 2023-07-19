@@ -75,6 +75,16 @@ if test_dict == test_tree.mem_table:
     print('HECKA SUCCESSFUL')
 
 
+old_dict = {1:200, 2:34, 23:67, 67:3040, 123: 239}
+
+tuples = list(old_dict.items())
+print(tuples)
+
+number = 3040
+if number in tuples[3]:
+    print(f'Yup. {number} is here.')
+
+
 
 
 
