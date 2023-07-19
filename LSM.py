@@ -120,22 +120,26 @@ class LSMTree():
             return self.mem_table.get(key)
         else:
             print('not found in mem table, searching disk')
-            for files in self.file_tree:
-                current = open(files)
-                contents_dict = current.read()
-                contents_dict = contents_dict.split(',')
-                contents_dict = [items.split(':') for items in contents_dict]
-                if key in contents_dict:
-                    print(f'key found in file {file}')
-                    return contents_dict.get(key)
-                contents_dict.clear()
+            return self.search_LSM_files(key)
         print('Key not found in LSM')
         return None
+
+    def search_LSM_files(self, key):
+        for files in self.file_tree:
+            current = open(files)
+            contents_dict = current.read()
+            contents_dict = contents_dict.split(',')
+            contents_dict = [items.split(':') for items in contents_dict]
+            if key in contents_dict:
+                print(f'key found in file {files}')
+                return contents_dict.get(key)
+            contents_dict.clear()
+
     
     def write(self, key, value):        #put
         self.mem_table.setdefault(key, 0)
         self.mem_table[key] = value
-        f = open('lsm.log', 'w')
+        f = open('lsm.log', 'a')
         f.write(f'{key}:{value},')
         f.close()
 
@@ -153,19 +157,105 @@ class LSMTree():
         #considering using date time + system time, should be unique enough
         pass
 
-    def write_to_disk(self):
-        #once mem_table is arbitrarily large enough, it is written to disk
-        #comma delineated?
-        self.mem_table = dict(sorted(self.mem_table))     #figure out if this is more efficient or sort with each insertion?
-        self.file_tree.appendleft(self.filename_generator())
-        filename = self.tree_dir + self.file_tree[-1] + '.csv'
-        new_file = open(filename, 'xw')
 
-        bookend_list = list(self.mem_table.keys())
+#when to write to disk? and should file size be limited to xxxx kb?
+    def write_to_disk(self, sstable: dict, filename):
+        ordered_keys = list(sorted(sstable))     #more efficient to sort with each insertion?
+        if filename not in self.file_tree:
+            self.file_tree.appendleft(filename)
+        filename = self.tree_dir + self.file_tree[-1] + '.csv'
+        new_file = open(filename, 'w')
+
+        bookend_list = list(sstable.keys())
         first, last = bookend_list[0], bookend_list[-1] #could present difficulty-- does not follow key:value format of the file
         
         new_file.write(f'{first}, {last}, \n')      #this writes a first and last key at the top of the file (might delete)
-        new_file.write(self.mem_table)
+        
+        for key in ordered_keys:
+            new_file.write(f'{key}:{sstable.get(key)},')
         new_file.close()
-        self.mem_table.clear()
+        
+        #clear the log after writing to disk
+        #think about moving this elsewhere after broadening use of write_to_disk()
+        log = open('lsm.log', 'w')
+        log.write('')
+        log.close()
+
+    def load_to_memory(self, filename):
+        read_file = open(filename)
+        file_contents = read_file.read()
+        file_contents_dict = file_contents.split(',')
+        file_contents_dict = [items.split(':') for items in file_contents_dict]
+        return dict(file_contents_dict)
+
+
+#lay good groundwork...
+#eventually the structure is too large to be confined to one file after compaction
+#How to plan for this?
+#Compaction is likely too big to fit all in memory, so a log of the process is necessary
+#ANSWER:
+#load first elements from each sorted file and compare across files, write lowest key:value to compacted file, pop, repeat
+
+    def compaction(self):
+        tombstone_set = set()
+        duplicates = set()
+        c_log = open('compaction_log.log')
+        temp = open('temp_file')
+        #first, let's clear out older entries, lower the number of comparisons
+        dict_a = self.mem_table
+        for files in self.file_tree:
+            dict_b = self.load_to_memory(files)
+            #first look for tombstones and pop
+            for key, value in dict_a.items():
+                if value == 'del':
+                    tombstone_set.add(key)
+            for key in tombstone_set:
+                dict_a.pop(key)
+
+            duplicates.add(set(dict_a).intersection(dict_b))    #creates a list of duplicate values as they are traversed
+            for keys in duplicates:
+                dict_b.pop(keys)
+            self.write_to_disk(dict_b, files)
+            dict_a = dict_b             #have to test, this may set dict_a as a pointer to dict_b
+
+
+
+        
+        if key in compaction_dict:
+            pass
+
+        elif key in tombstone_set:
+            pass
+
+        else:
+            compaction_dict[key] = value
+
+
+'''compaction can be done in one pass:
+compare the first elements across sorted files something like this
+
+for files in file_tree:
+    first_elems.append((files[0], files[1]))        #gets first element from each file
+    first_elems.sort()
+    while first_elems[0] == 'del' or first_elems[0] in tombstone_set:
+        tombstone_set.add(first_elems[0])
+        file.pop(first_elems[0])
+        first_elems.pop(0)
+    while first_elems[0] == file.lastadded:
+        first_elems.pop(0)
+    file.write(first_elems[0])
+    #pop first_elems[0] from its file and repeat
+    
+    something like that. Definitely some bugs built into this code, what if the whole first_elems list is dupes?
+    Maybe make a short elements cache list, duplicates should come up at the same time across files
+    
+    
+    This approach might have me changing the format of .txt output to many lines
+    file.readline() could be the solution for compaction'''
+
+
+
+
+
+        
 
