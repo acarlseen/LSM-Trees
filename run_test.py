@@ -39,3 +39,9 @@ test_tree.write_to_disk(test_tree.mem_table, 'somefile')
 
 if test_dict == test_tree.mem_table:
     print('HECKA SUCCESSFUL')
+
+test_tree.mem_table.clear()
+test_tree.recover_from_log()
+print(test_tree.mem_table)
+if test_dict == test_tree.mem_table:
+    print('HECKA SUCCESSFUL')    

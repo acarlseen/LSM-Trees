@@ -1,3 +1,6 @@
+import random
+import linecache
+
 
 new_dict = {x:x**2 for x in range(100)}
 print(new_dict)
@@ -85,7 +88,34 @@ if number in tuples[3]:
     print(f'Yup. {number} is here.')
 
 
+with open('somefile.txt') as f:
+    for lines in f:
+        print(lines)
 
 
+# Testing sorting and popping
 
+N = 5
+R = 10
+key = 5
 
+list_of_tuples = [ [divmod(ele, R + 1) for ele in random.sample(range((R + 1) * (R + 1)), N)] for x in range(10)]
+
+list_of_tuples[1].pop(0)
+
+for i, tuples in enumerate(list_of_tuples):
+    print(tuples)
+
+print('-----------------')
+
+for i, tuples in enumerate(list_of_tuples):
+    if tuples[0][0] == key:
+        if len(tuples) == 1:
+            #go back to log file and grab 50 more key:value pairs
+            for x in range(50):
+                temp = linecache.getline(test_tree.file_tree[i], x)     #list_of_tuples should mirror file_tree indexes
+                temp = temp[:-1]                                        #shave off escape char
+                temp = temp.split(':')                                  #split into tuple
+                tuples.append(temp)                                     #append to list of tuples before....
+        tuples.pop(0)                                                   #always popping the matching tuple at index 0
+    print(tuples)
