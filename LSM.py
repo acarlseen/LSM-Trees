@@ -34,6 +34,10 @@ Compare key:value pairs across segments and update to most recent value:
 
 import collections
 import linecache
+import uuid
+import json
+
+DELETED = None
 
 class LSMTree():
 
@@ -43,7 +47,8 @@ class LSMTree():
         self.mem_table = {}
 
     def search_LSM(self, key): #does this funcion return anything?
-        if key in self.mem_table:
+        # return 'None' if key has been deleted or if element does not exist
+        if str(key) in self.mem_table:
             print('found in mem table')
             return self.mem_table.get(key)
         else:
@@ -54,79 +59,62 @@ class LSMTree():
 
     def search_LSM_files(self, key):
         for files in self.file_tree:
-            current = open(files)
-            contents_dict = current.read()
-            contents_dict = contents_dict.split(',')
-            contents_dict = [items.split(':') for items in contents_dict]
+            contents_dict = self.load_to_memory(files)
             if key in contents_dict:
                 print(f'key found in file {files}')
                 return contents_dict.get(key)
             contents_dict.clear()
+        return None
 
     
     def write(self, key, value):        #put
+        key = str(key)
         self.mem_table.setdefault(key, 0)
         self.mem_table[key] = value
-        f = open('lsm.log', 'a')
-        f.write(f'{key}:{value}\n')
-        f.close()
+        with open('lsm.log', 'a') as f:
+            f.write(f'{key}:{value}\n')
 
     def read(self, key):                #get
+        key = str(key)
         if key in self.mem_table:
             return self.mem_table.get(key)
         
     def delete(self, key):
+        key = str(key)
         self.mem_table.setdefault(key, 0)
-        self.mem_table[key] = 'del'
-        f = open('lsm.log', 'a')
-        f.write(f'{key}:del\n')
-        f.close()
+        self.mem_table[key] = None
+        with open('lsm.log', 'a') as f:
+            f.write(f'{key}:{None}\n')
 
 
     def filename_generator(self) -> str:
         #creates a "unique" filename in a specified directory and returns it as a string
-        #considering using date time + system time, should be unique enough
-        pass
-
+        return str(uuid.uuid4())
 
 #when to write to disk? and should file size be limited to xxxx kb?
     def write_to_disk(self, sstable: dict, filename):
-        ordered_keys = list(sorted(sstable))     #more efficient to sort with each insertion?
-        if filename not in self.file_tree:
-            self.file_tree.appendleft(filename)
-        filename = self.tree_dir + self.file_tree[-1] + '.txt'
-        new_file = open(filename, 'w')
-
-        bookend_list = list(sstable.keys())
-        first, last = bookend_list[0], bookend_list[-1] #could present difficulty-- does not follow key:value format of the file
-        
-        new_file.write(f'{first}, {last} \n')      #this writes a first and last key at the top of the file (might delete)
-        
-        for key in ordered_keys:
-            new_file.write(f'{key}:{sstable.get(key)}\n')
-        new_file.close()
-        
-        #trim the last \n from the .txt file
-        new_file = open(filename, 'rb+')
-        new_file.seek(-1, 2)
-        new_file.truncate()
-        new_file.close()
-        
-        #clear the log after writing to disk
-        #think about moving this elsewhere after broadening use of write_to_disk()
-        #log = open('lsm.log', 'w')
-        #log.write('')
-        #log.close()
+        #re-wrote the above code using JSON instead. Significantly more compact
+        filename = self.filename_generator()
+        with open(filename, 'w') as j:
+            json.dump(self.mem_table, j, sort_keys=True)
+        self.file_tree.appendleft(filename)
+        #clear the mem_table log file
+        with open('lsm.log', 'w') as log:
+            log.write('')
 
         #WISHLIST: A meta file that provides line no. for data in files across the structure
         #to behave like a skip list for lookup
 
     def load_to_memory(self, filename):
-        read_file = open(filename)
+        '''read_file = open(filename)
         file_contents = read_file.read()
         file_contents_dict = file_contents.split('\n')
-        file_contents_dict = [items.split(':') for items in file_contents_dict]
+        file_contents_dict = [items.split(':') for items in file_contents_dict] #make this a generator
         return dict(file_contents_dict)
+'''
+        #re-write the above using JSON
+        with open(filename, 'r') as read_file:
+            return json.load(filename)
 
 
 #lay good groundwork...
@@ -137,69 +125,34 @@ class LSMTree():
 #load first elements from each sorted file and compare across files, write lowest key:value to compacted file, pop, repeat
 
     def compaction(self):
-        tombstone_set = set()
-        duplicates = set()
-        c_log = open('compaction_log.log')
-        temp = open('temp_file')
-        #first, let's clear out older entries, lower the number of comparisons 
-        #the following code should go back in time, deleting repeated elements after most recent assignment
-        dict_a = self.mem_table
-        for files in self.file_tree:
-            dict_b = self.load_to_memory(files)
-            #first look for tombstones and pop
-            for key, value in dict_a.items():
-                if value == 'del':
-                    tombstone_set.add(key)
-            for key in tombstone_set:
-                dict_a.pop(key)
-
-            duplicates.add(set(dict_a).intersection(dict_b))    #creates a list of duplicate values as they are traversed
-            for keys in duplicates:
-                dict_b.pop(keys)
-            self.write_to_disk(dict_b, files)
-            dict_a = dict_b             #have to test, this may set dict_a as a pointer to dict_b
-
-            #Immediate problem with this code as-written: only comparing adjacent files
-            #this means that if file A and file C have elements in common, but not shared with file B
-            #the redundant elements persist.
-
-            #Now, across all log files, there should only be one of each key
+        #First, let's delete all of the tombstoned values, sequentially
+        # mem_table first
+        tombstone_list = [key for key, value in self.memtable.items() if value == None]
+        for key in tombstone_list:
+            self.mem_table.pop(key)
+        # files next, in order from most recent to oldest
+        for f in self.file_tree:
+            with open(f, 'r') as j:
+                json_dict = j.load()
+                tombstone_list_builder = [key for key, value in json_dict.items() if value == None]
+                tombstone_list.extend(tombstone_list_builder)
+                tombstone_list_builder.clear()
+                for key in tombstone_list:
+                    if key in json_dict:
+                        json_dict.pop(key)
+            with open(f,'w') as j:    
+                json.dump(json_dict, j)
         
-        #let's load elements from file, 50 at a time
-        #the following should generate a list of the first 50 lines from each file
-        unsorted_tuples = []
-        temp_tuples = []
-        for files in self.file_tree:
-            for x in range(50):
-                temp = linecache.getline(files, x)
-                temp = temp[:-1]
-                temp_tuples.append(temp.split(':'))
-            unsorted_tuples.append(temp_tuples)
-            temp_tuples.clear()
+        # free up a little memory
+        tombstone_list.clear()
 
-        
-        #Now we want to pull the first tuple from each list in the array and sort
-        sorted_tuples = []
-        for lists in unsorted_tuples:
-            sorted_tuples.append(lists[0])
-        
-        sorted_tuples.sort()
-        #pull the zero element from sorted_tuples, write to file, and pop the element from our unsorted tuples list
-
-        #write to file
-        (key, value) = sorted_tuples[0]
-        with open(filename) as compaction:
-            compaction.write(f'{key}:{value}\n')
-
-        for i, tuples in unsorted_tuples:
-            if tuples[0][0] == key:
-                tuples.pop(0)
-
+        #Now all tombstoned keys should be gone, lowering our comparisons
+        #Next load n elements from each chunk file, then compare the firts 
+                #This might not work with JSON. 
+                #Maybe the data needs to be in DIRs and broken into smaller chunks?
+                #Maybe I can work with a different sorting algorithm?
 
                 
-
-
-
 
         
         if key in compaction_dict:
@@ -236,7 +189,12 @@ class LSMTree():
 
 
 
-
+    def recover_LSM(self):
+        #import os, glob
+        #search dir and return list of files in order of creation (newest first), this becomes self.file_tree
+        #side note: may have to pass in a dir as an argument
+        #call recover_from_log to rebuild current mem_table
+        pass
 
     def recover_from_log(self):
         temp_tuple = tuple()
@@ -252,6 +210,3 @@ class LSMTree():
                     pass
 
         
-
-
-
