@@ -33,7 +33,7 @@ Compare key:value pairs across segments and update to most recent value:
 '''
 
 import collections
-import linecache
+import os
 import uuid
 import json
 
@@ -43,10 +43,10 @@ class LSMTree():
 
     def __init__(self, tree_dir: str) -> None:
         self.file_tree = collections.deque([])      #using deque to make left append efficient O(1) instead of O(n) with list
-        self.tree_dir = tree_dir
+        self.tree_dir = 'LSM_chunks/'
         self.mem_table = {}
 
-    def search_LSM(self, key): #does this funcion return anything?
+    def search_LSM(self, key):
         # return 'None' if key has been deleted or if element does not exist
         if str(key) in self.mem_table:
             print('found in mem table')
@@ -72,7 +72,8 @@ class LSMTree():
         self.mem_table.setdefault(key, 0)
         self.mem_table[key] = value
         with open('lsm.log', 'a') as f:
-            f.write(f'{key}:{value}\n')
+            json.dump(self.mem_table, f)
+            #f.write(f'{key}:{value}\n')
 
     def read(self, key):                #get
         key = str(key)
@@ -84,14 +85,17 @@ class LSMTree():
         self.mem_table.setdefault(key, 0)
         self.mem_table[key] = None
         with open('lsm.log', 'a') as f:
-            f.write(f'{key}:{None}\n')
+            json.dump(self.mem_table, f)
+            #f.write(f'{key}:{None}\n')
 
 
     def filename_generator(self) -> str:
         #creates a "unique" filename in a specified directory and returns it as a string
-        return str(uuid.uuid4())
+        return self.tree_dir + str(uuid.uuid4())
 
 #when to write to disk? and should file size be limited to xxxx kb?
+#should sstable have a default assignment of self.mem_table? 
+#or should compaction have its own write to disk method so self.file_tree doesn't get totally messed up?
     def write_to_disk(self, sstable: dict, filename):
         #re-wrote the above code using JSON instead. Significantly more compact
         filename = self.filename_generator()
@@ -106,13 +110,6 @@ class LSMTree():
         #to behave like a skip list for lookup
 
     def load_to_memory(self, filename):
-        '''read_file = open(filename)
-        file_contents = read_file.read()
-        file_contents_dict = file_contents.split('\n')
-        file_contents_dict = [items.split(':') for items in file_contents_dict] #make this a generator
-        return dict(file_contents_dict)
-'''
-        #re-write the above using JSON
         with open(filename, 'r') as read_file:
             return json.load(filename)
 
@@ -122,9 +119,10 @@ class LSMTree():
 #How to plan for this?
 #Compaction is likely too big to fit all in memory, so a log of the process is necessary
 #ANSWER:
-#load first elements from each sorted file and compare across files, write lowest key:value to compacted file, pop, repeat
+#Merge sort two chunk files together (divide as necessary afterwards?) at a time, 
 
     def compaction(self):
+        compaction_file_tree = []
         #First, let's delete all of the tombstoned values, sequentially
         # mem_table first
         tombstone_list = [key for key, value in self.memtable.items() if value == None]
@@ -147,46 +145,65 @@ class LSMTree():
         tombstone_list.clear()
 
         #Now all tombstoned keys should be gone, lowering our comparisons
-        #Next load n elements from each chunk file, then compare the firts 
-                #This might not work with JSON. 
-                #Maybe the data needs to be in DIRs and broken into smaller chunks?
-                #Maybe I can work with a different sorting algorithm?
 
+        
+        #this might need to be written as a function that is called with two dictionaries
+        #so compaction can consolidate 2 files into 1 (recursively?), eventually resulting in 1 file
+        compaction_dict = {}
+        
+        file_tree_len = len(self.file_tree) - 1
+        while self.file_tree:
+
+            compaction_file_tree.append(self.compaction_merge_sort())
+        
+            #killing file_tree elements to satisfy loop calling this function. Maybe move it up there?
+            os.remove(self.file_tree[0])
+            self.file_tree.popleft()
+
+            self.balance_files(compaction_file_tree)
+        
+        #write to file
+        
+        with open(filename, 'w'):
+            json.dump(compaction_dict)
+
+        #then balance file sizes for memory loading consideration...
+
+    def compaction_merge_sort(self):
+        #might want to pass two dicts as arguments? Handle the opening and loading in self.compaction?
+        compaction_dict = {}
+        #load two adjacent chunks
+        recent_contents_dict = self.load_to_memory(self.file_tree[0])
+        older_contents_dict = self.load_to_memory(self.file_tree[1])
+        
+        #put keys into indexed format, deque to maintain constant pop(0) time complexity
+        ordered_keys_recent = collections.deque(recent_contents_dict.keys())
+        ordered_keys_older = collections.deque(older_contents_dict.keys())
+        #using the two deques, merge sort two dicts into one
+        while ordered_keys_recent and ordered_keys_older:
+            if ordered_keys_recent[0] <= ordered_keys_older[0]:
+                if ordered_keys_recent[0] == ordered_keys_older[0]:
+                    older_contents_dict.pop(ordered_keys_older[0])
+                    ordered_keys_older.popleft()
+                compaction_dict.update(recent_contents_dict.pop(ordered_keys_recent[0]))
+                ordered_keys_recent.popleft()
+            else:
+                compaction_dict.update(older_contents_dict.pop(ordered_keys_older(0)))
+                ordered_keys_older.popleft()
+        
+        return compaction_dict
+
+    def balance_files(self, compaction_tree: list):
+        for f in compaction_tree:
+            with open(f, 'r'):
+                contents_dict = json.load(f)
+            if len(content_dict) >= 5:
+                sorted_keys = sorted(contents_dict.keys())
                 
-
-        
-        if key in compaction_dict:
-            pass
-
-        elif key in tombstone_set:
-            pass
-
-        else:
-            compaction_dict[key] = value
-
-
-    '''compaction can be done in one pass:
-    compare the first elements across sorted files something like this
-
-    for files in file_tree:
-        first_elems.append((files[0], files[1]))        #gets first element from each file
-        first_elems.sort()
-        while first_elems[0] == 'del' or first_elems[0] in tombstone_set:
-            tombstone_set.add(first_elems[0])
-            file.pop(first_elems[0])
-            first_elems.pop(0)
-        while first_elems[0] == file.lastadded:
-            first_elems.pop(0)
-        file.write(first_elems[0])
-        #pop first_elems[0] from its file and repeat
-        
-    something like that. Definitely some bugs built into this code, what if the whole first_elems list is dupes?
-    Maybe make a short elements cache list, duplicates should come up at the same time across files
-
-
-    This approach might have me changing the format of .txt output to many lines
-    file.readline() could be the solution for compaction'''
-
+                
+    def compaction_write(compaction_dict: dict):
+        with open('compaction/testing', 'w'):
+            json.dump(compaction_dict)
 
 
     def recover_LSM(self):
