@@ -151,7 +151,5 @@ with open('scratch_test', 'w') as f:
     json.dump(file_data, f)
 
 
-with open('LSM_chunks/ff638d4a-f9cd-46a4-8463-c5601f473a02', 'r') as f:
-    thing = json.load(f)
+print(str(f))
 
-print(thing)
