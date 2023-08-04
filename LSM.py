@@ -66,7 +66,7 @@ class LSMTree():
             contents_dict.clear()
         return None
 
-    
+    #add a trigger to dump mem_table to disk
     def write(self, key, value):        #put
         key = str(key)
         self.mem_table.setdefault(key, 0)
@@ -96,7 +96,7 @@ class LSMTree():
 #when to write to disk? and should file size be limited to xxxx kb?
 #should sstable have a default assignment of self.mem_table? 
 #or should compaction have its own write to disk method so self.file_tree doesn't get totally messed up?
-    def write_to_disk(self, sstable: dict, filename):
+    def flush_mem_table(self, filename):
         #re-wrote the above code using JSON instead. Significantly more compact
         filename = self.filename_generator()
         with open(filename, 'w') as j:
@@ -131,7 +131,7 @@ class LSMTree():
         # files next, in order from most recent to oldest
         for f in self.file_tree:
             with open(f, 'r') as j:
-                json_dict = j.load()
+                json_dict = json.load(f)
                 tombstone_list_builder = [key for key, value in json_dict.items() if value == None]
                 tombstone_list.extend(tombstone_list_builder)
                 tombstone_list_builder.clear()

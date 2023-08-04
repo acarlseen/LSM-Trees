@@ -21,7 +21,7 @@ for tups in command_list:
     elif command == 2:
         print(test_tree.read(key))
     elif command == 3:
-        test_tree.write_to_disk(test_tree.mem_table, test_tree.filename_generator())
+        test_tree.flush_mem_table(test_tree.mem_table, test_tree.filename_generator())
     elif command == 4:
         pass
         # test_tree.recover_from_log()
@@ -34,7 +34,7 @@ for key in pop_list:
 print(f'dict is: {test_dict}')
 print(f'tree is {test_tree.mem_table}')
 
-test_tree.write_to_disk(test_tree.mem_table, 'somefile')
+test_tree.flush_mem_table(test_tree.mem_table, 'somefile')
 
 if test_dict == test_tree.mem_table:
     print('HECKA SUCCESSFUL')

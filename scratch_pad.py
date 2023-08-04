@@ -78,7 +78,7 @@ if test_dict == test_tree.mem_table:
     print('HECKA SUCCESSFUL')
 
 
-old_dict = {1:200, 2:34, 23:67, 67:3040, 123: 239, 14: 293, 7: 934}
+old_dict = {1:200, 2:34, 23:67, 67:3040, 123: 239, 14: 293, 7: 934, 2134596: 14, 96827325788: 32, 6823634905630: 36}
 
 tuples = list(old_dict.items())
 print(tuples)
@@ -152,4 +152,8 @@ with open('scratch_test', 'w') as f:
 
 
 print(str(f))
+
+num = 3
+print(num)
+print(-num)
 
