@@ -5,7 +5,7 @@ import bool_field as bf
 #Now I have a big question: What to do if we delete an element?
 # hashing n%10 would yield 5 for 15, 25, 35, etc, so how do we update the filter?
 
-word = 'hello'
+'''word = 'hello'
 word_value = hash(word)
 print(word[:4])
 print(random.random())
@@ -22,7 +22,7 @@ print(f'num_array is {num_array}')
 
 trim = 2
 trimmed_num = int(str(num)[trim: -trim])
-print(type(trimmed_num))
+print(type(trimmed_num))'''
 
 
 class BloomFilter():
@@ -112,27 +112,27 @@ class BloomFilter():
 #----------------------------------------------------
 #--------------Testing Bloom Filter------------------
 #----------------------------------------------------
+if __name__ == '__main__':
+    test_list = [random.randint(0, 15) for x in range(5)]
+    print(test_list)
 
-test_list = [random.randint(0, 15) for x in range(5)]
-print(test_list)
+    with open('scratch_test', 'r') as f:
+        test_data = json.load(f)
 
-with open('scratch_test', 'r') as f:
-    test_data = json.load(f)
+    bloom = BloomFilter(100, 2)
+    for num in test_data.keys():
+        bloom.insert(num)
+        print(bloom.hash2(num))
 
-bloom = BloomFilter(100, 2)
-for num in test_data.keys():
-    bloom.insert(num)
-    print(bloom.hash2(num))
+    print(test_data)
+    print(bloom.bloom_array)
 
-print(test_data)
-print(bloom.bloom_array)
+    print(bloom.bloom_array.print_field())
 
-print(bloom.bloom_array.print_field())
-
-look_for = str(random.randint(0,50))
-if bloom.search(look_for):
-    print(f'{look_for} might be present')
-else:
-    print(f'{look_for} is not present')
+    look_for = str(random.randint(0,50))
+    if bloom.search(look_for):
+        print(f'{look_for} might be present')
+    else:
+        print(f'{look_for} is not present')
 
 

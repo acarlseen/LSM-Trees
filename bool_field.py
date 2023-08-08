@@ -22,6 +22,7 @@ import math
 class bool_field():
 
     def __init__(self, size: int):
+        self.size = size
         self.length = math.ceil(size/32)
         self.bool_array = [0]*self.length
     
@@ -34,23 +35,61 @@ class bool_field():
     def get(self, hash_val):
         array_index = math.floor(hash_val / 32)
         bit_index = hash_val % 32
-        bits = bin(self.bool_array[array_index])[2:]        #for some reason, these two lines cannot be combined
-        bits = bits[::-1]                                   #slicing behaves strangely with [2::-1]
-        return int(bits[bit_index])
+        try:
+            bits = bin(self.bool_array[array_index])[2:]        #for some reason, these two lines cannot be combined
+            bits = bits[::-1]                                   #slicing behaves strangely with [2::-1]
+            return int(bits[bit_index])
+        except IndexError:
+            return False
     
     def print_field(self):
+        '''bit_string = ''
+        for element in self.bool_array:
+            temp = str(bin(element))[2:]
+            bit_string += temp[::-1]
+        print(bit_string)'''
         bit_string = ''
         for element in self.bool_array:
-            bit_string += str(bin(element))
+            temp = str(bin(element))[2:]
+            if len(temp) < 32:
+                if len(bit_string) + 32 < self.size:
+                    extension_length = 32 - len(temp)
+                else:
+                    extension_length = self.size - (len(temp) + len(bit_string))
+                extension = ['0']*extension_length
+                ext_str = ''
+                temp = ext_str.join(extension) + temp
+            bit_string += temp[::-1]
         print(bit_string)
+        return(bit_string)
+    
+    def array_copy(self):
+        bit_string = ''
+        for element in self.bool_array:
+            temp = str(bin(element))[2:]
+            if len(temp) < 32:
+                if len(bit_string) + 32 < self.size:
+                    extension_length = 32 - len(temp)
+                else:
+                    extension_length = self.size - (len(temp) + len(bit_string))
+                extension = ['0']*extension_length
+                ext_str = ''
+                temp = ext_str.join(extension) + temp
+            bit_string += temp[::-1]
+        str_list = [*bit_string]
+        return list(map(int, str_list))
 
-temp = 0
-a = 2**6
-b = 2**3
-temp = a | b
 
-print(temp)
-bits = bin(temp)[2:]
-bits = bits[::-1]
-print(bits)
+#---------------------------------------------------
+#----------------Bool Field Testing-----------------
+#---------------------------------------------------
+
+if __name__ == '__main__':
+    bf = bool_field(85)
+    bf.print_field()
+    bf.insert(31)
+    bf.insert(80)
+    bf.print_field()
+    array = bf.array_copy()
+    print(len(array))
     

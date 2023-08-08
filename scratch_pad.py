@@ -153,7 +153,7 @@ with open('scratch_test', 'w') as f:
 
 print(str(f))
 
-num = 3
-print(num)
-print(-num)
-
+num = 72
+bits = bin(num)
+for i in bits:
+    print(i)
