@@ -5,9 +5,9 @@ import random
 def command_generator(this_many):
     return [(random.randint(0,1), str(random.randint(0,1000))) for x in range(this_many)]
 
-def array_test(command_list):
-    test_bloom = [0]*96
-    bloom = f.BloomFilter(96, 2)
+def array_test(command_list, array_size):
+    test_bloom = [0]*array_size
+    bloom = f.BloomFilter(array_size, 2)
     for tup in command_list:
         (command, key) = tup
         
@@ -45,4 +45,4 @@ def array_test(command_list):
 
 if __name__ == '__main__':
     commands = command_generator(300)
-    array_test(commands)
+    array_test(commands, 97)
